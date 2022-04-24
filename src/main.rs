@@ -1,7 +1,7 @@
 
 #[derive(Debug, Clone)]
 struct Node {
-    elems: Vec<NodeOrLeaves>
+    elems: Vec<Vec<NodeOrLeaves>>
 }
 
 use std::cell::RefCell;
@@ -14,20 +14,22 @@ enum NodeOrLeaves {
 }
 macro_rules! process_terminal{
     ($v:ident, $y:literal) => {
-        $v.borrow_mut().elems.push(NodeOrLeaves::Literal($y.to_string()));
+        $v.borrow_mut().elems.push(vec![NodeOrLeaves::Literal($y.to_string())]);
     }
 }
 
 macro_rules! process_nonterminal {
-    ($x:ident, |) => {};
-    ($x:ident, +) => {};
+    ($x:ident, |) => {$x.borrow_mut().elems.push(vec![])};
+    ($x:ident, +) => {$x.borrow_mut().elems.push(vec![])};
     ($x:ident, $y:literal) => {
         let leaf = NodeOrLeaves::Literal($y.to_string());
-        $x.borrow_mut().elems.push(leaf);
+        let length = $x.borrow_mut().elems.len();
+        $x.borrow_mut().elems[length - 1].push(leaf);
     };
     ($x:ident, $y:ident) => {
         let node : NodeOrLeaves = NodeOrLeaves::Node($y.clone());
-        $x.borrow_mut().elems.push(node);
+        let length = $x.borrow_mut().elems.len();
+        $x.borrow_mut().elems[length - 1].push(node);
     };
     ($x:ident, ($($y:tt)*)) => {
         $(
@@ -51,9 +53,9 @@ macro_rules! parse_oneline {
 }
 
 fn main() {
-    let expression: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![]}));
-    let number: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![]}));
-    let digit: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![]}));
+    let expression: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![vec![]]}));
+    let number: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![vec![]]}));
+    let digit: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![vec![]]}));
     parse_oneline!(expression <- number "+" number | number "-" number);
     parse_oneline!(number <- digit+);
     parse_oneline!(digit <- "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9");
