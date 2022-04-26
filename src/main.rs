@@ -1,7 +1,14 @@
 
 #[derive(Debug, Clone)]
 struct Node {
-    elems: Vec<Vec<NodeOrLeaves>>
+    children: Vec<NodeOrLeaves>,
+    brother: Option<NodeOrLeaves>
+}
+
+#[derive(Debug, Clone)]
+struct Leaf {
+    brother: Option<Box<NodeOrLeaves>>,
+    literal: String,
 }
 
 use std::cell::RefCell;
@@ -10,7 +17,24 @@ use std::rc::Rc;
 #[derive(Debug, Clone)]
 enum NodeOrLeaves {
     Node(Rc<RefCell<Node>>),
-    Literal(String),
+    Leaf(Leaf),
+}
+
+impl NodeOrLeaves {
+    pub fn set_brother(&mut self, brother: NodeOrLeaves) -> (){
+        match self {
+            NodeOrLeaves::Node(n) => {
+                let temp2;
+                let temp = n.borrow();
+                match temp.brother{
+                    None => {n.borrow_mut().brother = Some(brother.clone())},
+                    Some(_) => {temp2 = temp.brother.clone()}
+                }
+                n.borrow_mut().brother = Some(brother.clone())
+            },
+            NodeOrLeaves::Leaf(l) => (l.brother = Some(Box::new(brother))),
+        }
+    }
 }
 macro_rules! process_terminal{
     ($v:ident, $y:literal) => {
@@ -19,47 +43,49 @@ macro_rules! process_terminal{
 }
 
 macro_rules! process_nonterminal {
-    ($x:ident, |) => {$x.borrow_mut().elems.push(vec![])};
-    ($x:ident, +) => {$x.borrow_mut().elems.push(vec![])};
-    ($x:ident, $y:literal) => {
-        let leaf = NodeOrLeaves::Literal($y.to_string());
-        let length = $x.borrow_mut().elems.len();
-        $x.borrow_mut().elems[length - 1].push(leaf);
+    ($y:ident, /) => {$y.borrow_mut().children.push(NodeOrLeaves::Leaf(Leaf{literal: "".to_string(), brother: None}))};
+    ($y:ident, $x:literal) => {
+        let leaf = NodeOrLeaves::Leaf(Leaf{literal: $x.to_string(), brother: None});
+        let current_children_length = $y.borrow_mut().children.len();
+        if current_children_length == 0 {
+            $y.borrow_mut().children.push(leaf);
+        } else {
+            $y.borrow_mut().children[current_children_length - 1].set_brother(leaf);
+        }
     };
-    ($x:ident, $y:ident) => {
-        let node : NodeOrLeaves = NodeOrLeaves::Node($y.clone());
-        let length = $x.borrow_mut().elems.len();
-        $x.borrow_mut().elems[length - 1].push(node);
+    ($y:ident, $x:ident) => {
+        let node : NodeOrLeaves = NodeOrLeaves::Node($x.clone());
+        let current_children_length = $y.borrow_mut().children.len();
+        if current_children_length == 0 {
+            $y.borrow_mut().children.push(node);
+        } else {
+            $y.borrow_mut().children[current_children_length - 1].set_brother(node);
+        }
     };
-    ($x:ident, ($($y:tt)*)) => {
+    ($y:ident, ($($x:tt)*)) => {
         $(
-            process_nonterminal!($x, $y);
+            process_nonterminal!($y, $x);
         )*
     };
 }
 
 macro_rules! parse_oneline {
-    ($x:ident <- $($y:literal)|*) => (
+    ($y:ident <- $($x:tt)*) => (
         $(
-            process_terminal!($x, $y);
-        )*
-    );
-    ($x:ident <- $($y:tt)*) => (
-        $(
-             process_nonterminal!($x, $y);
+             process_nonterminal!($y, $x);
         )*
     );
     
 }
 
 fn main() {
-    let expression: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![vec![]]}));
-    let number: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![vec![]]}));
-    let digit: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {elems: vec![vec![]]}));
-    parse_oneline!(expression <- number "+" number | number "-" number);
-    parse_oneline!(number <- digit+);
-    parse_oneline!(digit <- "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9");
-    println!("{:?}", expression);
+    let expression: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {children: vec![], brother: None}));
+    let number: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {children: vec![], brother: None}));
+    let digit: Rc<RefCell<Node>> = Rc::new(RefCell::new(Node {children: vec![], brother: None}));
+    // parse_oneline!(expression <- number "+" number / number "-" number);
+    // parse_oneline!(number <- digit+);
+    parse_oneline!(number <- "1" "3" "9" / "2" "4");
     println!("{:?}", number);
-    println!("{:?}", digit);
+    // println!("{:?}", number);
+    // println!("{:?}", digit);
 }
